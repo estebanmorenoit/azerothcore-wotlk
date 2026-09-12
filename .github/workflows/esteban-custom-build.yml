@@ -9,7 +9,7 @@ on:
       tag:
         description: 'Docker tag to build and push'
         required: true
-        default: 'ahbot-test'
+        default: 'progression-test'
 
 env:
   DOCKER_BUILDKIT: 1
@@ -53,6 +53,12 @@ jobs:
         with:
           repository: NathanHandley/mod-ah-bot-plus
           path: modules/mod-ah-bot
+
+      - name: Checkout mod-individual-progression
+        uses: actions/checkout@v7
+        with:
+          repository: ZhengPeiRu21/mod-individual-progression
+          path: modules/mod-individual-progression
 
       - name: Patch known mod-llm-chatter compile bug
         run: python3 apps/docker/patch-llm-chatter.py
