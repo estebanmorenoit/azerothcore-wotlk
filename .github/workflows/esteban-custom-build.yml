@@ -9,7 +9,7 @@ on:
       tag:
         description: 'Docker tag to build and push'
         required: true
-        default: 'npc-buffer-test'
+        default: 'cfbg-achievements-test'
 
 env:
   DOCKER_BUILDKIT: 1
@@ -65,6 +65,18 @@ jobs:
         with:
           repository: azerothcore/mod-npc-buffer
           path: modules/mod-npc-buffer
+
+      - name: Checkout mod-cfbg
+        uses: actions/checkout@v7
+        with:
+          repository: azerothcore/mod-cfbg
+          path: modules/mod-cfbg
+
+      - name: Checkout mod-account-achievements
+        uses: actions/checkout@v7
+        with:
+          repository: azerothcore/mod-account-achievements
+          path: modules/mod-account-achievements
 
       - name: Patch known mod-llm-chatter compile bug
         run: python3 apps/docker/patch-llm-chatter.py
