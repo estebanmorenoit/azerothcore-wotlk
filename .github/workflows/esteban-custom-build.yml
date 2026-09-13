@@ -9,7 +9,7 @@ on:
       tag:
         description: 'Docker tag to build and push'
         required: true
-        default: 'progression-test'
+        default: 'npc-buffer-test'
 
 env:
   DOCKER_BUILDKIT: 1
@@ -59,6 +59,12 @@ jobs:
         with:
           repository: ZhengPeiRu21/mod-individual-progression
           path: modules/mod-individual-progression
+
+      - name: Checkout mod-npc-buffer
+        uses: actions/checkout@v7
+        with:
+          repository: azerothcore/mod-npc-buffer
+          path: modules/mod-npc-buffer
 
       - name: Patch known mod-llm-chatter compile bug
         run: python3 apps/docker/patch-llm-chatter.py
