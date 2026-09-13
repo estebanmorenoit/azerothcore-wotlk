@@ -1,5 +1,5 @@
-name: esteban-custom-build
-# Personal build workflow for this fork — separate from upstream's docker_build.yml,
+name: build-images
+# Build workflow for this fork — separate from upstream's docker_build.yml,
 # which is hard-gated to only ever run/push on mod-playerbots/azerothcore-wotlk and
 # would silently no-op here. Manual trigger only, tags images distinctly (never
 # ":master") so nothing gets overwritten until validated.
