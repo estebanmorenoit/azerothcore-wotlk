@@ -9,7 +9,7 @@ on:
       tag:
         description: 'Docker tag to build and push'
         required: true
-        default: 'instance-reset-test'
+        default: 'quest-loot-fix-test'
 
 env:
   DOCKER_BUILDKIT: 1
@@ -86,6 +86,9 @@ jobs:
 
       - name: Patch known mod-llm-chatter compile bug
         run: python3 apps/docker/patch-llm-chatter.py
+
+      - name: Patch mod-playerbots to defer shared quest items to the master
+        run: python3 apps/docker/patch-playerbots-quest-loot.py
 
       - name: Login to Docker Hub
         uses: docker/login-action@v3
