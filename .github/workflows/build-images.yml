@@ -84,6 +84,12 @@ jobs:
           repository: azerothcore/mod-instance-reset
           path: modules/mod-instance-reset
 
+      - name: Checkout mod-random-enchants
+        uses: actions/checkout@v7
+        with:
+          repository: azerothcore/mod-random-enchants
+          path: modules/mod-random-enchants
+
       - name: Patch known mod-llm-chatter compile bug
         run: python3 apps/docker/patch-llm-chatter.py
 
