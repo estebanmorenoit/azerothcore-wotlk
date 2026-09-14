@@ -90,9 +90,6 @@ jobs:
           repository: azerothcore/mod-random-enchants
           path: modules/mod-random-enchants
 
-      - name: Patch known mod-llm-chatter compile bug
-        run: python3 apps/docker/patch-llm-chatter.py
-
       - name: Patch mod-playerbots to defer shared quest items to the master
         run: python3 apps/docker/patch-playerbots-quest-loot.py
 

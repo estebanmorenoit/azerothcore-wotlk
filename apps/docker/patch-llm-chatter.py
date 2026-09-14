@@ -1,9 +1,16 @@
 #!/usr/bin/env python3
-# mod-llm-chatter's upstream SendPartyMessageInstant() calls
+# NOT CALLED from build-images.yml as of 2026-09-14 — upstream fixed this
+# themselves (Hokken/mod-llm-chatter@master's SendPartyMessageInstant() now
+# calls BuildChatPacket with the correct 8-arg overload matching this core's
+# Chat.h, confirmed by diffing the two). Kept for reference in case it
+# regresses; re-add the "Patch known mod-llm-chatter compile bug" step in
+# build-images.yml pointing at this script if the build ever fails the same
+# way again.
+#
+# Originally: mod-llm-chatter's upstream SendPartyMessageInstant() called
 # ChatHandler::BuildChatPacket() with an argument order from an older
-# AzerothCore signature, which fails to compile against this core (see
+# AzerothCore signature, which failed to compile against this core (see
 # wow-server-playerbots README's "Known upstream issue in mod-llm-chatter").
-# Confirmed still present in Hokken/mod-llm-chatter@master as of this writing.
 # Regex (not exact string match) so minor upstream whitespace changes don't
 # silently break this — a real signature/argument change should still fail
 # loudly via the count check below.
