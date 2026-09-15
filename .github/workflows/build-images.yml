@@ -3,6 +3,14 @@ name: build-images
 # which is hard-gated to only ever run/push on mod-playerbots/azerothcore-wotlk and
 # would silently no-op here. Manual trigger only, tags images distinctly (never
 # ":master") so nothing gets overwritten until validated.
+#
+# Publishes to GHCR (ghcr.io/estebanmorenoit/...), not Docker Hub: auth is the
+# repo's own ephemeral GITHUB_TOKEN (scoped to this one run, expires with it)
+# rather than a long-lived Docker Hub PAT stored as two separate secrets and
+# again in this host's own ~/.docker/config.json. Each image also gets a real
+# SLSA-style build provenance attestation (which commit/workflow run built it,
+# verifiable via `gh attestation verify`) and an SBOM, both attached directly
+# to the pushed image.
 on:
   workflow_dispatch:
     inputs:
@@ -13,6 +21,14 @@ on:
 
 env:
   DOCKER_BUILDKIT: 1
+  REGISTRY: ghcr.io
+  IMAGE_OWNER: estebanmorenoit
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+  attestations: write
 
 jobs:
   build-and-push:
@@ -93,63 +109,104 @@ jobs:
       - name: Patch mod-playerbots to defer shared quest items to the master
         run: python3 apps/docker/patch-playerbots-quest-loot.py
 
-      - name: Login to Docker Hub
+      - name: Login to GHCR
         uses: docker/login-action@v4
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
       - name: build worldserver
+        id: build-worldserver
         uses: docker/build-push-action@v7
         with:
           context: .
           file: apps/docker/Dockerfile
           push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/ac-wotlk-worldserver-playerbots:${{ inputs.tag }}
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/ac-wotlk-worldserver-playerbots:${{ inputs.tag }}
           target: worldserver
+          provenance: true
+          sbom: true
           build-args: |
             USER_ID=1000
             GROUP_ID=1000
             DOCKER_USER=acore
+
+      - name: Attest worldserver provenance
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/ac-wotlk-worldserver-playerbots
+          subject-digest: ${{ steps.build-worldserver.outputs.digest }}
+          push-to-registry: true
 
       - name: build authserver
+        id: build-authserver
         uses: docker/build-push-action@v7
         with:
           context: .
           file: apps/docker/Dockerfile
           push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/ac-wotlk-authserver-playerbots:${{ inputs.tag }}
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/ac-wotlk-authserver-playerbots:${{ inputs.tag }}
           target: authserver
+          provenance: true
+          sbom: true
           build-args: |
             USER_ID=1000
             GROUP_ID=1000
             DOCKER_USER=acore
+
+      - name: Attest authserver provenance
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/ac-wotlk-authserver-playerbots
+          subject-digest: ${{ steps.build-authserver.outputs.digest }}
+          push-to-registry: true
 
       - name: build db-import
+        id: build-db-import
         uses: docker/build-push-action@v7
         with:
           context: .
           file: apps/docker/Dockerfile
           push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/ac-wotlk-db-import-playerbots:${{ inputs.tag }}
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/ac-wotlk-db-import-playerbots:${{ inputs.tag }}
           target: db-import
+          provenance: true
+          sbom: true
           build-args: |
             USER_ID=1000
             GROUP_ID=1000
             DOCKER_USER=acore
 
+      - name: Attest db-import provenance
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/ac-wotlk-db-import-playerbots
+          subject-digest: ${{ steps.build-db-import.outputs.digest }}
+          push-to-registry: true
+
       - name: build client-data
+        id: build-client-data
         uses: docker/build-push-action@v7
         with:
           context: .
           file: apps/docker/Dockerfile
           push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/ac-wotlk-client-data-playerbots:${{ inputs.tag }}
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/ac-wotlk-client-data-playerbots:${{ inputs.tag }}
           target: client-data
+          provenance: true
+          sbom: true
           build-args: |
             USER_ID=1000
             GROUP_ID=1000
             DOCKER_USER=acore
+
+      - name: Attest client-data provenance
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/ac-wotlk-client-data-playerbots
+          subject-digest: ${{ steps.build-client-data.outputs.digest }}
+          push-to-registry: true
