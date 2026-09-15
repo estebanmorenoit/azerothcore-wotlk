@@ -4,6 +4,27 @@
 [![CodeFactor](https://www.codefactor.io/repository/github/azerothcore/azerothcore-wotlk/badge)](https://www.codefactor.io/repository/github/azerothcore/azerothcore-wotlk)
 [![Discord](https://img.shields.io/discord/217589275766685707?logo=discord&logoColor=white)](https://discord.gg/gkt4y2x "Our community hub on Discord")
 
+---
+
+## About this fork
+
+This is a personal build fork (`Playerbot` branch) that exists for exactly one reason: to build the four Docker images consumed by **[wow-server-playerbots](https://github.com/estebanmorenoit/wow-server-playerbots)** — a self-hosted solo-play realm ([live showcase](https://estebanmorenoit.github.io/wow-server-playerbots/)) with ten gameplay modules baked in. The DevOps/CI work lives here, in `.github/workflows/`:
+
+- **[`build-images.yml`](.github/workflows/build-images.yml)** — manual-trigger only, never runs on push. Checks out all ten modules explicitly (`modules/*` is gitignored by design), patches a couple of known upstream compile issues, then builds and publishes `worldserver`/`authserver`/`db-import`/`client-data` to **GHCR**. Each image gets:
+  - **No stored credentials** — auth is the workflow's own ephemeral `GITHUB_TOKEN`, scoped to that run and expired the moment it finishes, not a long-lived registry PAT.
+  - **A real build provenance attestation** (which commit and workflow run produced it), verifiable independently:
+    ```bash
+    gh attestation verify oci://ghcr.io/estebanmorenoit/ac-wotlk-worldserver-playerbots:master --owner estebanmorenoit
+    ```
+  - **An SBOM** attached to the image manifest.
+  - Its own tag while under test (never overwrites `:master` directly) — only promoted once verified working against the live realm.
+
+- **[`sync-upstream.yml`](.github/workflows/sync-upstream.yml)** — runs weekly (plus manual dispatch), checks whether `mod-playerbots/azerothcore-wotlk`'s `Playerbot` branch has moved, and opens a PR here if so. Detection-only: it never merges or rebuilds on its own — bringing in an upstream change, rebuilding, and promoting a tag all stay separate, deliberate steps.
+
+Everything below this point is upstream AzerothCore's own README, unmodified.
+
+---
+
 ## Build Status
 
 [![nopch-build](https://github.com/azerothcore/azerothcore-wotlk/actions/workflows/core-build-nopch.yml/badge.svg?branch=master)](https://github.com/azerothcore/azerothcore-wotlk/actions/workflows/core-build-nopch.yml?query=branch%3Amaster)
