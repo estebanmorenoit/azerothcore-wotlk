@@ -18,13 +18,6 @@ on:
 permissions:
   contents: write
   pull-requests: write
-  # Upstream can add/modify files under .github/workflows/ (it did, adding
-  # codestyle.yml) - GitHub blocks the default GITHUB_TOKEN from pushing
-  # any change to that directory without this scope explicitly granted,
-  # regardless of contents: write. Without it, the merge itself succeeds
-  # but the push is rejected with "refusing to allow a GitHub App to
-  # create or update workflow ... without `workflows` permission".
-  workflows: write
 
 jobs:
   check-and-open-pr:
@@ -51,11 +44,41 @@ jobs:
 
       - name: Create sync branch and merge upstream
         if: steps.check.outputs.count != '0'
+        id: merge
         run: |
           git config user.name "sync-upstream[bot]"
           git config user.email "actions@github.com"
           git checkout -b sync/upstream-playerbot
           git merge upstream/Playerbot --no-edit
+
+          # GitHub unconditionally blocks the default GITHUB_TOKEN from
+          # pushing any change under .github/workflows/, regardless of
+          # what's declared in this file's `permissions:` block above -
+          # that restriction can only be lifted with a PAT carrying the
+          # classic `workflow` OAuth scope, stored as a secret, which
+          # isn't set up here (found the hard way: a `workflows: write`
+          # permission entry doesn't exist and fails to even parse).
+          # Rather than add that credential, revert just this directory
+          # back to Playerbot's own version after merging, so the push
+          # below can succeed - upstream's workflow changes are skipped,
+          # not lost: they're still visible via the diff link the next
+          # step puts in the PR body, for manual review/import.
+          if ! git diff --quiet Playerbot -- .github/workflows/; then
+            git rm -r -q --ignore-unmatch .github/workflows
+            git checkout Playerbot -- .github/workflows/
+            git add .github/workflows
+            git commit -m "Keep this fork's own .github/workflows/ after syncing upstream
+
+          GitHub blocks the default GITHUB_TOKEN from pushing any change
+          under .github/workflows/ (needs a PAT with the workflow OAuth
+          scope, not set up here) - reverting this path so the branch can
+          be pushed at all. See the PR body for a diff of what upstream
+          actually changed there, to bring in manually if wanted."
+            echo "workflows_excluded=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "workflows_excluded=false" >> "$GITHUB_OUTPUT"
+          fi
+
           git push origin sync/upstream-playerbot --force
 
       - name: List new commits for the PR body
@@ -81,7 +104,17 @@ jobs:
           # treats them as inert data instead.
           COMMIT_COUNT: ${{ steps.check.outputs.count }}
           COMMIT_LOG: ${{ steps.log.outputs.commits }}
+          WORKFLOWS_EXCLUDED: ${{ steps.merge.outputs.workflows_excluded }}
         run: |
+          if [ "$WORKFLOWS_EXCLUDED" = "true" ]; then
+            WORKFLOWS_NOTE="
+          **Heads up:** upstream also changed something under \`.github/workflows/\` — that part was skipped (GitHub blocks this workflow's token from pushing there at all, see sync-upstream.yml's own comments). Check what changed and bring in anything you want manually:
+          \`git fetch upstream Playerbot && git diff Playerbot upstream/Playerbot -- .github/workflows/\`
+          "
+          else
+            WORKFLOWS_NOTE=""
+          fi
+
           if gh pr list --head sync/upstream-playerbot --state open --json number --jq '.[0]' | grep -q .; then
             echo "PR already open for sync/upstream-playerbot — updated branch pushed, nothing else to do."
           else
@@ -92,6 +125,6 @@ jobs:
               --body "New commits on mod-playerbots/azerothcore-wotlk's Playerbot branch, merged cleanly into a branch off this fork's Playerbot:
 
           ${COMMIT_LOG}
-
+          ${WORKFLOWS_NOTE}
           Review and merge when ready — this doesn't touch build-images.yml or any deployed image on its own."
           fi
