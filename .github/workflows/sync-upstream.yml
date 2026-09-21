@@ -122,16 +122,30 @@ jobs:
             WORKFLOWS_NOTE=""
           fi
 
-          if gh pr list --head sync/upstream-playerbot --state open --json number --jq '.[0]' | grep -q .; then
-            echo "PR already open for sync/upstream-playerbot — updated branch pushed, nothing else to do."
-          else
-            gh pr create \
-              --base Playerbot \
-              --head sync/upstream-playerbot \
-              --title "Sync ${COMMIT_COUNT} commit(s) from upstream" \
-              --body "New commits on mod-playerbots/azerothcore-wotlk's Playerbot branch, merged cleanly into a branch off this fork's Playerbot:
+          # gh pr create/list go through GitHub's GraphQL API, which
+          # rejected createPullRequest with "Resource not accessible by
+          # integration" for the Actions token even with pull-requests:
+          # write granted here AND the repo's own Actions settings
+          # (default workflow permissions, "create and approve pull
+          # requests") both already set to allow it - confirmed across
+          # three separate live test runs. The plain REST endpoint for
+          # the same operation (used below via `gh api`) works under the
+          # exact same token and permissions; this is a known gap between
+          # GraphQL mutations and REST for Actions tokens, not something
+          # fixable by requesting more scopes.
+          BODY="New commits on mod-playerbots/azerothcore-wotlk's Playerbot branch, merged cleanly into a branch off this fork's Playerbot:
 
           ${COMMIT_LOG}
           ${WORKFLOWS_NOTE}
           Review and merge when ready — this doesn't touch build-images.yml or any deployed image on its own."
+
+          EXISTING=$(gh api "repos/${GITHUB_REPOSITORY}/pulls?head=${GITHUB_REPOSITORY_OWNER}:sync/upstream-playerbot&base=Playerbot&state=open" --jq '.[0].number')
+          if [ -n "$EXISTING" ]; then
+            echo "PR #$EXISTING already open for sync/upstream-playerbot — updated branch pushed, nothing else to do."
+          else
+            gh api "repos/${GITHUB_REPOSITORY}/pulls" \
+              -f title="Sync ${COMMIT_COUNT} commit(s) from upstream" \
+              -f head="sync/upstream-playerbot" \
+              -f base="Playerbot" \
+              -f body="$BODY"
           fi
