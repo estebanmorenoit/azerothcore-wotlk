@@ -18,6 +18,13 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  # Upstream can add/modify files under .github/workflows/ (it did, adding
+  # codestyle.yml) - GitHub blocks the default GITHUB_TOKEN from pushing
+  # any change to that directory without this scope explicitly granted,
+  # regardless of contents: write. Without it, the merge itself succeeds
+  # but the push is rejected with "refusing to allow a GitHub App to
+  # create or update workflow ... without `workflows` permission".
+  workflows: write
 
 jobs:
   check-and-open-pr:
