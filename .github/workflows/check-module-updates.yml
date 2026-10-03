@@ -1,0 +1,116 @@
+name: check-module-updates
+# Watches each of the 10 external modules build-images.yml checks out
+# (mod-playerbots, mod-solocraft, mod-llm-chatter, mod-ah-bot-plus,
+# mod-individual-progression, mod-npc-buffer, mod-cfbg,
+# mod-account-achievements, mod-instance-reset, mod-random-enchants) for
+# new commits on their own default branch. build-images.yml always clones
+# each one's live HEAD with nothing pinned or tracked, so it's completely
+# blind to whether any of them changed since the last build - this is
+# that missing signal.
+#
+# Detection-only, same philosophy as sync-upstream.yml: never triggers a
+# build, never touches build-images.yml. Opens or updates a tracking
+# issue instead of a PR, since modules aren't vendored into this repo's
+# tree - there's nothing here to merge, just something to review and
+# decide whether to re-test.
+#
+# Uses the REST API directly (gh api) rather than `gh issue create`/
+# `gh pr list`, which go through GitHub's GraphQL API - learned the hard
+# way in sync-upstream.yml that GraphQL mutations can be rejected for the
+# Actions token ("Resource not accessible by integration") even when the
+# equivalent REST endpoint works fine under the exact same permissions.
+on:
+  schedule:
+    - cron: '0 10 * * 1' # Every Monday, 10:00 UTC - an hour after sync-upstream
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  check-modules:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: Playerbot
+
+      - name: Check each module for new commits
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          STATE_FILE=".github/module-state.json"
+          [ -f "$STATE_FILE" ] || echo '{}' > "$STATE_FILE"
+
+          MODULES="mod-playerbots/mod-playerbots
+          azerothcore/mod-solocraft
+          Hokken/mod-llm-chatter
+          NathanHandley/mod-ah-bot-plus
+          ZhengPeiRu21/mod-individual-progression
+          azerothcore/mod-npc-buffer
+          azerothcore/mod-cfbg
+          azerothcore/mod-account-achievements
+          azerothcore/mod-instance-reset
+          azerothcore/mod-random-enchants"
+
+          CHANGED=""
+          while IFS= read -r repo; do
+            [ -z "$repo" ] && continue
+            default_branch=$(gh api "repos/$repo" --jq '.default_branch')
+            latest_sha=$(gh api "repos/$repo/commits/$default_branch" --jq '.sha')
+            old_sha=$(jq -r --arg r "$repo" '.[$r] // ""' "$STATE_FILE")
+
+            # Empty old_sha means first time this module's been seen (new
+            # module added, or this workflow's first ever run) - record a
+            # baseline silently rather than reporting every module as
+            # "changed" the first time this runs.
+            if [ -n "$old_sha" ] && [ "$old_sha" != "$latest_sha" ]; then
+              CHANGED="${CHANGED}- **${repo}**: new commits on \`${default_branch}\` - https://github.com/${repo}/commits/${default_branch}
+          "
+            fi
+
+            jq --arg r "$repo" --arg sha "$latest_sha" '.[$r] = $sha' "$STATE_FILE" > "$STATE_FILE.tmp"
+            mv "$STATE_FILE.tmp" "$STATE_FILE"
+          done <<< "$MODULES"
+
+          delimiter="EOF_$(uuidgen)"
+          {
+            echo "changed<<$delimiter"
+            echo "$CHANGED"
+            echo "$delimiter"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Commit updated state
+        run: |
+          git config user.name "check-module-updates[bot]"
+          git config user.email "actions@github.com"
+          git add .github/module-state.json
+          if ! git diff --cached --quiet; then
+            git commit -m "Update tracked module commit SHAs"
+            git push origin HEAD:Playerbot
+          else
+            echo "No change in tracked SHAs - nothing to commit."
+          fi
+
+      - name: Open or update tracking issue
+        if: steps.check.outputs.changed != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CHANGED: ${{ steps.check.outputs.changed }}
+        run: |
+          BODY="New commits detected on these modules since the last check:
+
+          ${CHANGED}
+          Review each and decide whether to re-test/rebuild (\`build-images.yml\`, manual trigger). This issue is detection-only - nothing gets rebuilt, merged, or deployed automatically."
+
+          EXISTING=$(gh api "repos/${GITHUB_REPOSITORY}/issues?state=open" --jq '[.[] | select(.title == "Module updates detected")][0].number')
+
+          if [ -n "$EXISTING" ]; then
+            gh api "repos/${GITHUB_REPOSITORY}/issues/${EXISTING}/comments" -f body="$BODY"
+          else
+            gh api "repos/${GITHUB_REPOSITORY}/issues" \
+              -f title="Module updates detected" \
+              -f body="$BODY"
+          fi
