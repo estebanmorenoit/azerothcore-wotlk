@@ -1,0 +1,12 @@
+{
+  "mod-playerbots/mod-playerbots": "e9cc38cc046184d91aceccc71e4e2760cc18be7d",
+  "azerothcore/mod-solocraft": "59588838988d1b74111d26670d99d0e649014b93",
+  "Hokken/mod-llm-chatter": "d6cdb47581aeb3382023888e3c995030a8566b15",
+  "NathanHandley/mod-ah-bot-plus": "f685832994c825f90aa5a3dc0e1620aa568e875b",
+  "ZhengPeiRu21/mod-individual-progression": "723c510c685cca184d8b96b6c22452bd48fda23a",
+  "azerothcore/mod-npc-buffer": "532a6ba80c31b673338fcdb747cb2226bec4887e",
+  "azerothcore/mod-cfbg": "78771c6d0d9d5fcd80206eaeb9668452adcbf4ee",
+  "azerothcore/mod-account-achievements": "bfbe3677635feeef823057964e028e023633115a",
+  "azerothcore/mod-instance-reset": "1e2c20770f40f5382348b7649291371f47c86812",
+  "azerothcore/mod-random-enchants": "6d49d64918f1e798490d0139038a33194fd294df"
+}
