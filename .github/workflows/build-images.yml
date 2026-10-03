@@ -43,6 +43,29 @@ jobs:
 
       - uses: actions/checkout@v7
 
+      # Each module used to be checked out at whatever its default branch's
+      # HEAD happened to be at build time - no record anywhere of exactly
+      # what version actually went into a given image, and two builds a
+      # week apart could silently differ. modules.lock.json pins each one
+      # to a specific commit instead; bump a pin deliberately via
+      # update-module-pin.yml, not by this file just floating forward on
+      # its own. check-module-updates.yml watches for new upstream commits
+      # and opens an issue, but never writes to this lock file itself -
+      # noticing and updating stay two separate, deliberate steps.
+      - name: Read module version pins
+        id: lock
+        run: |
+          echo "playerbots_sha=$(jq -r '.["mod-playerbots/mod-playerbots"]' modules.lock.json)" >> "$GITHUB_OUTPUT"
+          echo "solocraft_sha=$(jq -r '.["azerothcore/mod-solocraft"]' modules.lock.json)" >> "$GITHUB_OUTPUT"
+          echo "llm_chatter_sha=$(jq -r '.["Hokken/mod-llm-chatter"]' modules.lock.json)" >> "$GITHUB_OUTPUT"
+          echo "ah_bot_sha=$(jq -r '.["NathanHandley/mod-ah-bot-plus"]' modules.lock.json)" >> "$GITHUB_OUTPUT"
+          echo "individual_progression_sha=$(jq -r '.["ZhengPeiRu21/mod-individual-progression"]' modules.lock.json)" >> "$GITHUB_OUTPUT"
+          echo "npc_buffer_sha=$(jq -r '.["azerothcore/mod-npc-buffer"]' modules.lock.json)" >> "$GITHUB_OUTPUT"
+          echo "cfbg_sha=$(jq -r '.["azerothcore/mod-cfbg"]' modules.lock.json)" >> "$GITHUB_OUTPUT"
+          echo "account_achievements_sha=$(jq -r '.["azerothcore/mod-account-achievements"]' modules.lock.json)" >> "$GITHUB_OUTPUT"
+          echo "instance_reset_sha=$(jq -r '.["azerothcore/mod-instance-reset"]' modules.lock.json)" >> "$GITHUB_OUTPUT"
+          echo "random_enchants_sha=$(jq -r '.["azerothcore/mod-random-enchants"]' modules.lock.json)" >> "$GITHUB_OUTPUT"
+
       # modules/* is gitignored in this repo (by design — see modules/CMakeLists.txt's
       # generic auto-discovery), so every module needed in the image has to be
       # checked out explicitly, same pattern as upstream's own "Download Eluna" step.
@@ -50,60 +73,70 @@ jobs:
         uses: actions/checkout@v7
         with:
           repository: mod-playerbots/mod-playerbots
+          ref: ${{ steps.lock.outputs.playerbots_sha }}
           path: modules/mod-playerbots
 
       - name: Checkout mod-solocraft
         uses: actions/checkout@v7
         with:
           repository: azerothcore/mod-solocraft
+          ref: ${{ steps.lock.outputs.solocraft_sha }}
           path: modules/mod-solocraft
 
       - name: Checkout mod-llm-chatter
         uses: actions/checkout@v7
         with:
           repository: Hokken/mod-llm-chatter
+          ref: ${{ steps.lock.outputs.llm_chatter_sha }}
           path: modules/mod-llm-chatter
 
       - name: Checkout mod-ah-bot
         uses: actions/checkout@v7
         with:
           repository: NathanHandley/mod-ah-bot-plus
+          ref: ${{ steps.lock.outputs.ah_bot_sha }}
           path: modules/mod-ah-bot
 
       - name: Checkout mod-individual-progression
         uses: actions/checkout@v7
         with:
           repository: ZhengPeiRu21/mod-individual-progression
+          ref: ${{ steps.lock.outputs.individual_progression_sha }}
           path: modules/mod-individual-progression
 
       - name: Checkout mod-npc-buffer
         uses: actions/checkout@v7
         with:
           repository: azerothcore/mod-npc-buffer
+          ref: ${{ steps.lock.outputs.npc_buffer_sha }}
           path: modules/mod-npc-buffer
 
       - name: Checkout mod-cfbg
         uses: actions/checkout@v7
         with:
           repository: azerothcore/mod-cfbg
+          ref: ${{ steps.lock.outputs.cfbg_sha }}
           path: modules/mod-cfbg
 
       - name: Checkout mod-account-achievements
         uses: actions/checkout@v7
         with:
           repository: azerothcore/mod-account-achievements
+          ref: ${{ steps.lock.outputs.account_achievements_sha }}
           path: modules/mod-account-achievements
 
       - name: Checkout mod-instance-reset
         uses: actions/checkout@v7
         with:
           repository: azerothcore/mod-instance-reset
+          ref: ${{ steps.lock.outputs.instance_reset_sha }}
           path: modules/mod-instance-reset
 
       - name: Checkout mod-random-enchants
         uses: actions/checkout@v7
         with:
           repository: azerothcore/mod-random-enchants
+          ref: ${{ steps.lock.outputs.random_enchants_sha }}
           path: modules/mod-random-enchants
 
       - name: Patch mod-playerbots to defer shared quest items to the master

@@ -1,0 +1,97 @@
+name: update-module-pin
+# The deliberate half of the pinning system check-module-updates.yml
+# started: that workflow only notices and reports when a module has new
+# upstream commits, it never touches modules.lock.json itself. This is
+# the explicit action that actually moves a pin - run it, then
+# build-images.yml's next run uses whatever this just pinned.
+#
+# Manual trigger only, on purpose: bumping a module version should be a
+# decision, not something that happens on a schedule or silently as a
+# side effect of another workflow.
+on:
+  workflow_dispatch:
+    inputs:
+      module:
+        description: 'Which module to update'
+        required: true
+        type: choice
+        options:
+          - mod-playerbots/mod-playerbots
+          - azerothcore/mod-solocraft
+          - Hokken/mod-llm-chatter
+          - NathanHandley/mod-ah-bot-plus
+          - ZhengPeiRu21/mod-individual-progression
+          - azerothcore/mod-npc-buffer
+          - azerothcore/mod-cfbg
+          - azerothcore/mod-account-achievements
+          - azerothcore/mod-instance-reset
+          - azerothcore/mod-random-enchants
+      ref:
+        description: 'Branch, tag, or commit SHA to pin to. Leave empty to resolve the module''s own default branch HEAD right now (i.e. "update to latest").'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  update-pin:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: Playerbot
+
+      - name: Resolve the target commit SHA
+        id: resolve
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MODULE: ${{ inputs.module }}
+          REF: ${{ inputs.ref }}
+        run: |
+          if [ -z "$REF" ]; then
+            REF=$(gh api "repos/${MODULE}" --jq '.default_branch')
+            echo "No ref given - resolving ${MODULE}'s own default branch (${REF})."
+          fi
+
+          SHA=$(gh api "repos/${MODULE}/commits/${REF}" --jq '.sha')
+          if [ -z "$SHA" ] || [ "$SHA" = "null" ]; then
+            echo "::error::Could not resolve '${REF}' to a commit on ${MODULE}."
+            exit 1
+          fi
+
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+          echo "resolved_ref=$REF" >> "$GITHUB_OUTPUT"
+          echo "Resolved ${MODULE}@${REF} -> ${SHA}"
+
+      - name: Update modules.lock.json
+        env:
+          MODULE: ${{ inputs.module }}
+          SHA: ${{ steps.resolve.outputs.sha }}
+        run: |
+          OLD_SHA=$(jq -r --arg m "$MODULE" '.[$m] // "(not previously pinned)"' modules.lock.json)
+          jq --arg m "$MODULE" --arg sha "$SHA" '.[$m] = $sha' modules.lock.json > modules.lock.json.tmp
+          mv modules.lock.json.tmp modules.lock.json
+          echo "old_sha=$OLD_SHA" >> "$GITHUB_ENV"
+
+      - name: Commit the updated pin
+        env:
+          MODULE: ${{ inputs.module }}
+          SHA: ${{ steps.resolve.outputs.sha }}
+          RESOLVED_REF: ${{ steps.resolve.outputs.resolved_ref }}
+        run: |
+          git config user.name "update-module-pin[bot]"
+          git config user.email "actions@github.com"
+          git add modules.lock.json
+          if git diff --cached --quiet; then
+            echo "Already pinned to this exact commit - nothing to commit."
+          else
+            git commit -m "Pin ${MODULE} to ${SHA:0:8} (${RESOLVED_REF})
+
+          Was: ${old_sha}
+          Now: ${SHA}
+
+          Triggered manually via update-module-pin.yml. Run build-images.yml
+          next to actually build against this pin."
+            git push origin HEAD:Playerbot
+          fi
